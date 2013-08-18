@@ -1,8 +1,6 @@
 #ifndef __INDIVIDUAL_H
 #define __INDIVIDUAL_H
 
-
-
 #include <fstream>
 #include <sstream>
 #include <algorithm>    // std::copy
@@ -17,14 +15,12 @@ class Individual {
   public:
     double *vars; // stores params
     int numvars;
-    double sensitivity[5][15];
     
     double *fmax;
-    double *fmaxSensitivity ;
-    double *QSensitivity;
-    double *fwidthSensitivity;
-    double *ZmaxSensitivity;
-    double *Z10Sensitivity;
+    vector<double> zmaxSensitivity;
+    vector<double> fmaxSensitivity;
+    vector<double> qSensitivity;
+    vector<double> fWidthSensitivity;
     
     Individual(int nreal);
     ~Individual();
@@ -33,9 +29,9 @@ class Individual {
     void simulate(int id);
     double getFmax(string myfile);
     double getAttribute(int id, int zfAttr_id, double *pars);
-    void printZmaxSensitivity();
-    void printFmaxSensitivity();
-    void printQSensitivity();
-    void printFWidthSensitivity();
+    void printZmaxSensitivity(ostream&);
+    void printFmaxSensitivity(ostream&);
+    void printQSensitivity(ostream&);
+    void printFWidthSensitivity(ostream&);
 };
 #endif

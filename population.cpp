@@ -1,8 +1,8 @@
 #include <boost/foreach.hpp>
 #include "population.h"
 
-#define NUM_THREADS 16
-#define NUM_SIMS 9
+#define NUM_THREADS 1
+#define NUM_SIMS 1
 
 /* inline constructor */
 Population::Population(int popsize, int nreal) : _popsize(popsize) {
@@ -82,34 +82,7 @@ void Population::printFmax(ostream& os) {
 
 void Population::printZmaxSensitivity(ostream& os) {
     for (int i = 0; i < _popsize; i++) {
-        for (int j = 0; j < 15; j++) {
-            os << ind[i]->sensitivity[0][j] << "  ";
-        }
-        os << "\n";
-    }
-}
-
-void Population::printFmaxSensitivity(ostream& os) {
-    for (int i = 0; i < _popsize; i++) {
-        for (int j = 0; j < 15; j++) {
-            os << ind[i]->sensitivity[1][j] << "  ";
-        }
-        os << "\n";
-    }
-}
-void Population::printQSensitivity(ostream& os) {
-    for (int i = 0; i < _popsize; i++) {
-        for (int j = 0; j < 15; j++) {
-            os << ind[i]->sensitivity[2][j] << "  ";
-        }
-        os << "\n";
-    }
-}
-void Population::printFWidthSensitivity(ostream& os) {
-    for (int i = 0; i < _popsize; i++) {
-        for (int j = 0; j < 15; j++) {
-            os << ind[i]->sensitivity[3][j] << "  ";
-        }
-        os << "\n";
+        ind[i]->printZmaxSensitivity(os);
+        
     }
 }

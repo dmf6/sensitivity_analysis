@@ -21,42 +21,66 @@ Individual::~Individual() {
 void Individual::simulate(int id) {
     int n = 0;
     double stderror = 0;
-    double percent = 0.05;
         /* copy contents of vars into pars vector
          *
          * pars vector is what we will use when we change the
          * parameters
          */
     vector<double> pars(15);
-    vector<double> percentChange;
+    vector<double> parVector;
     
     vector<double> zfAttrs;
     int flag = 0;
-    double zf = 0.0;
+    double zf, zf0;
 
         /* variables for gsl_fit_linear */
     double c0, c1, cov00, cov01, cov11, chisq;
-    double s, stdev1; 
-    
-        /* for each attribute */
-    for (int i =0; i < 5; i++) {
-        stderror = 0;
-        
-            // for each parameter
-        for (int j = 0; j < 15; j++) {
-                /* simulate unchanged parameter string */
-            percentChange.push_back(0);
-            zf = getAttribute(id, i, vars);
-            cout << zf << "\n";
-                /* push the zf attribute value onto the vector */
-            zfAttrs.push_back(zf);
 
-            while (percent <= 0.2) {
+    double p0, p, pn;
+    p0 = 0.001;
+    
+    int m = 0;
+
+        /* for each attribute */
+    for (int i =0; i < 1; i++) {
+            // for each parameter
+        for (int j = 1; j < 3; j++) {
+            cout << "STARTING SENSITIVITY ANALYSIS OF ATTRIBUTE " << i << "TO CHANGES IN PARAMETER " << j << "\n\n\n\n\n";
+            
+            stderror = 0;
+/* simulate control */
+            zf0 = getAttribute(id, i, vars);
+
+            for (int k = 0; k < 2; k++) {
+                switch(k) {
+                    case 0:
+                        flag = -1;
+                        break;
+                    case 1:
+                        flag = 1;
+                        break;
+                }
+                copy (vars, vars+15, pars.begin());
+                    /* set start value for parameter */
+                p = exp(flag*p0)*pars[j];
+                parVector.push_back(p);
+                pars[j] = p;
+
+                zf = getAttribute(id, i, pars.data());
+                cout << zf << "\n";
+                    /* push the relative change in the zf attribute value onto the vector */
+                zfAttrs.push_back((zf-zf0)/zf0);
+            }
+            
+
+            m = 1;
+
+            while (stderror < 0.1) {
                 
                     //while (stderror < 0.1) {
                     /* for +/-x% change par[i] and run simulation. Save percent value and relative change in x and y vectors */
-                for (int k = 0; k < 2; k++) {
-                    switch(k) {
+                for (int l = 0; l < 2; l++) {
+                    switch(l) {
                         case 0:
                             flag = -1;
                             break;
@@ -64,58 +88,75 @@ void Individual::simulate(int id) {
                             flag = 1;
                             break;
                     }
-                        /* save the percent change value for the x vector used in the linear fit */
-                    percentChange.push_back(flag*(percent)*100);
-                    
                     copy (vars, vars+15, pars.begin());
-                        /* now we can change (or not) the parameters in the pars vector and send it off for simulation */
-                    pars[j] = pars[j] + flag*(percent)*pars[j];
+                        // continue p on logarithmic scale...i chose 10*m because the stepping would be too fine otherwise
+                    pn = pow(1.05, 10*m)*p0;
+                    p = exp(flag*pn)*pars[j];
+                    parVector.push_back(p);
+                    pars[j] = p;
                     
                     zf = getAttribute(id, i, pars.data());
                     cout << zf << "\n";
-                        /* push the zf attribute value onto the vector */
-                    zfAttrs.push_back(zf);
+                        /* push the realtive change in the zf attribute value onto the vector */
+                    zfAttrs.push_back((zf-zf0)/zf0);
                 }
-                percent +=0.05;
-            }
+               
+                m++;
+                
             
-            for (vector<double>::iterator it = zfAttrs.begin(); it!=zfAttrs.end(); ++it) {
-                cout << ' ' << *it;
-            }
-            cout << "\n";
-            
-            for (vector<double>::iterator it = percentChange.begin(); it!=percentChange.end(); ++it) {
-                cout << ' ' << *it;
-            }
-            
-            n = zfAttrs.size();
-            cout << "\n";
-            
-                /*perform linear fit */
-            gsl_fit_linear (percentChange.data(), 1, zfAttrs.data(), 1, n, 
-                            &c0, &c1, &cov00, &cov01, &cov11, 
-                            &chisq);
-            
-                /* refer to the ANOVA table in R */
-                //stdev1=sqrt(cov11);
-                //stderror=stdev1/sqrt(n);
+                for (vector<double>::iterator it = zfAttrs.begin(); it!=zfAttrs.end(); ++it) {
+                    cout << ' ' << *it;
+                }
+                cout << "\n";
+                
+                for (vector<double>::iterator it = parVector.begin(); it!=parVector.end(); ++it) {
+                    cout << ' ' << *it;
+                }
+                
+                n = zfAttrs.size();
+                cout << "\n";
+                
+                    /*perform linear fit */
+                gsl_fit_linear (parVector.data(), 1, zfAttrs.data(), 1, n, 
+                                &c0, &c1, &cov00, &cov01, &cov11, 
+                                &chisq);
+                
+                    /* refer to the ANOVA table in R */
+                stderror=sqrt(cov11);
 
-                /* standard error of the slope??? */
-            s = sqrt((cov00 -(pow(cov01, 2)/cov11))/(n-2));
-            stderror = s/sqrt(cov11);
-            sensitivity[i][j] = c1;
-            
-            // cout << "\n\n\n\n THE STANDARD ERROR IS " << stderror << "\n\n\n\n";
-            // cout << "\n\n\n\n THE SLOPE OF THE FIT IS " << c1 << "\n\n\n\n";
-            // cout  << "n\n\n\n R^2 IS " << cov11 << " " << cov00 << " " << cov01 << " " << n << " " << (pow(cov01, 2)/cov11) <<"\n\n\n\n";
-
+                    /* Not sensitive */
+                if (stderror == 0) {
+                    break;
+                }
+                
+                cout << "\n\n\n\n THE STANDARD ERROR IS " << stderror << "\n\n\n\n";
+                cout << "\n\n\n\n THE SLOPE OF THE FIT IS " << c1 << "\n\n\n\n";
+            }
+                /* clear the x and y vectors ready for the next run */
             zfAttrs.clear();
-            percentChange.clear();
-            percent=0.05;
-            
+            parVector.clear();
+                /* save sensitivity (slope of linear fit) for attribute once we have finished with the parameter stepping */
+            switch (i) {
+                case 0:
+                    zmaxSensitivity.push_back(c1);
+                    cout << "THE SENSITIVITY " << c1 << " WAS SAVED!!!!!!!\n\n\n\n\n";
+                    
+                    break;
+                case 1:
+                    fmaxSensitivity.push_back(c1);
+                    break;
+                case 2:
+                    qSensitivity.push_back(c1);
+                    break;
+                case 3:
+                    fWidthSensitivity.push_back(c1);
+                    break;
+            }
         }
     }
 }
+    
+
 
 /* given the parameter string return the ZF attribute value */
 double Individual::getAttribute(int id, int zfAttr_id, double *pars) {
@@ -216,30 +257,32 @@ double Individual::getFmax(string myfile) {
     
 }
 
-void Individual::printZmaxSensitivity() {
-    for (int i = 0; i < 15; i++) {
-        cout << sensitivity[0][i] << " ";
-    }
-    cout << "\n";
+void Individual::printZmaxSensitivity(ostream& os) {
+    for (vector<double>::iterator it = zmaxSensitivity.begin(); it!=zmaxSensitivity.end(); ++it) {
+            os << ' ' << *it;
+        }
+             os << "\n";
 }
 
-void Individual::printFmaxSensitivity() {
-    for (int i = 0; i < 15; i++) {
-        cout << sensitivity[1][i] << " ";
-    }
-    cout << "\n";
+void Individual::printFmaxSensitivity(ostream& os) {
+    for (vector<double>::iterator it = fmaxSensitivity.begin(); it!=fmaxSensitivity.end(); ++it) {
+            os << ' ' << *it;
+        }
+             os << "\n";
 }
 
-void Individual::printQSensitivity() {
-    for (int i = 0; i < 15; i++) {
-        cout << sensitivity[2][i] << " ";
-    }
-    cout << "\n";
+void Individual::printQSensitivity(ostream& os) {
+    for (vector<double>::iterator it = qSensitivity.begin(); it!=qSensitivity.end(); ++it) {
+            os << ' ' << *it;
+        }
+             os << "\n";
+  
 }
 
-void Individual::printFWidthSensitivity() {
-    for (int i = 0; i < 15; i++) {
-        cout << sensitivity[3][i] << " ";
-    }
-    cout << "\n";
+void Individual::printFWidthSensitivity(ostream& os) {
+    for (vector<double>::iterator it = fWidthSensitivity.begin(); it!=fWidthSensitivity.end(); ++it) {
+            os << ' ' << *it;
+        }
+             os << "\n";
+         
 }
