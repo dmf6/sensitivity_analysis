@@ -2,6 +2,8 @@
 #include <iostream>
 #include <cstdlib>
 #include <gsl/gsl_fit.h>
+#include <gsl/gsl_vector.h>
+#include <gsl/gsl_statistics.h>
 
 using namespace std;
 
@@ -34,23 +36,25 @@ void Individual::simulate(int id) {
     double zf, zf0;
 
         /* variables for gsl_fit_linear */
-    double c0, c1, cov00, cov01, cov11, chisq;
+    double c0, c1, cov00, cov01, cov11, sumsq;
 
-    double p0, p, pn;
+    double p0, pi0, p, pn, sct, R2, ym;
     p0 = 0.001;
+    R2 = 1;
     
     int m = 0;
 
         /* for each attribute */
-    for (int i =0; i < 1; i++) {
+    for (int i =1; i < 4; i++) {
             // for each parameter
-        for (int j = 1; j < 3; j++) {
+        for (int j = 0; j < 15; j++) {
             cout << "STARTING SENSITIVITY ANALYSIS OF ATTRIBUTE " << i << "TO CHANGES IN PARAMETER " << j << "\n\n\n\n\n";
             
             stderror = 0;
 /* simulate control */
             zf0 = getAttribute(id, i, vars);
-
+            pi0 = vars[j];
+            
             for (int k = 0; k < 2; k++) {
                 switch(k) {
                     case 0:
@@ -61,11 +65,27 @@ void Individual::simulate(int id) {
                         break;
                 }
                 copy (vars, vars+15, pars.begin());
-                    /* set start value for parameter */
-                p = exp(flag*p0)*pars[j];
-                parVector.push_back(p);
-                pars[j] = p;
 
+                
+                    /* set start value for parameter switch on
+                     *  parameter i...for mid-point voltage we need to
+                     *  add +/- 1mV */
+
+                switch(j) {
+                    case 3:
+                    case 7:
+                    case 11:
+                        cout << "Case 3 7 11\n";
+                        p = vars[j] + flag;
+                        parVector.push_back((p-pi0)/pi0);
+                        pars[j] = p;
+                        break;
+                    default:
+                        p = exp(flag*p0)*pars[j];
+                        parVector.push_back((p-pi0)/pi0);
+                        pars[j] = p;
+                }
+                
                 zf = getAttribute(id, i, pars.data());
                 cout << zf << "\n";
                     /* push the relative change in the zf attribute value onto the vector */
@@ -75,7 +95,7 @@ void Individual::simulate(int id) {
 
             m = 1;
 
-            while (stderror < 0.1) {
+            while (stderror < 0.1 && R2 > 0.85) {
                 
                     //while (stderror < 0.1) {
                     /* for +/-x% change par[i] and run simulation. Save percent value and relative change in x and y vectors */
@@ -88,12 +108,23 @@ void Individual::simulate(int id) {
                             flag = 1;
                             break;
                     }
-                    copy (vars, vars+15, pars.begin());
+                        //copy (vars, vars+15, pars.begin());
                         // continue p on logarithmic scale...i chose 10*m because the stepping would be too fine otherwise
-                    pn = pow(1.05, 10*m)*p0;
-                    p = exp(flag*pn)*pars[j];
-                    parVector.push_back(p);
-                    pars[j] = p;
+                    switch(j) {
+                        case 3:
+                        case 7:
+                        case 11:
+                            cout << "Case 3 7 11\n";
+                            p = vars[j] + (m+1)*flag;
+                            parVector.push_back((p-pi0)/pi0);
+                            pars[j] = p;
+                            break;
+                        default:
+                            pn = pow(1.05, 10*m)*p0;
+                            p = exp(flag*pn)*pars[j];
+                            parVector.push_back((p-pi0)/pi0);
+                            pars[j] = p;
+                    }
                     
                     zf = getAttribute(id, i, pars.data());
                     cout << zf << "\n";
@@ -119,17 +150,24 @@ void Individual::simulate(int id) {
                     /*perform linear fit */
                 gsl_fit_linear (parVector.data(), 1, zfAttrs.data(), 1, n, 
                                 &c0, &c1, &cov00, &cov01, &cov11, 
-                                &chisq);
+                                &sumsq);
                 
                     /* refer to the ANOVA table in R */
                 stderror=sqrt(cov11);
-
-                    /* Not sensitive */
-                if (stderror == 0) {
-                    break;
+                ym = gsl_stats_mean(zfAttrs.data(), 1, n);
+                sct = 0.0;
+                for (int l = 0; l < n; l++) {
+                    sct += pow(zfAttrs[l]-ym, 2);  // total sum of squares
                 }
+
+                R2=1-sumsq/sct;
+                    /* Not sensitive */
+                // if (stderror == 0) {
+                //     break;
+                // }
                 
                 cout << "\n\n\n\n THE STANDARD ERROR IS " << stderror << "\n\n\n\n";
+                cout << "\n\n\n\n R^2 is  " << R2 << "\n\n\n\n";
                 cout << "\n\n\n\n THE SLOPE OF THE FIT IS " << c1 << "\n\n\n\n";
             }
                 /* clear the x and y vectors ready for the next run */
@@ -143,6 +181,7 @@ void Individual::simulate(int id) {
                     
                     break;
                 case 1:
+                    cout << "THE SENSITIVITY " << c1 << " WAS SAVED!!!!!!!\n\n\n\n\n";
                     fmaxSensitivity.push_back(c1);
                     break;
                 case 2:

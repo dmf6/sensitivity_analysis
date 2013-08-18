@@ -86,3 +86,24 @@ void Population::printZmaxSensitivity(ostream& os) {
         
     }
 }
+
+void Population::printFmaxSensitivity(ostream& os) {
+    for (int i = 0; i < _popsize; i++) {
+        ind[i]->printFmaxSensitivity(os);
+        
+    }
+}
+
+void Population::printQSensitivity(ostream& os) {
+    for (int i = 0; i < _popsize; i++) {
+        ind[i]->printQSensitivity(os);
+        
+    }
+}
+
+void Population::printFWidthSensitivity(ostream& os) {
+    for (int i = 0; i < _popsize; i++) {
+        ind[i]->printFWidthSensitivity(os);
+        
+    }
+}
