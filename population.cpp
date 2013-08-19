@@ -1,8 +1,8 @@
 #include <boost/foreach.hpp>
 #include "population.h"
 
-#define NUM_THREADS 1
-#define NUM_SIMS 1
+#define NUM_THREADS 16
+#define NUM_SIMS 9
 
 /* inline constructor */
 Population::Population(int popsize, int nreal) : _popsize(popsize) {

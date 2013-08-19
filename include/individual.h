@@ -7,6 +7,8 @@
 #include <vector>
 #include <boost/smart_ptr.hpp>
 
+#include "random.h"
+
 using namespace std;
 using namespace boost;
 
@@ -15,6 +17,7 @@ class Individual {
   public:
     double *vars; // stores params
     int numvars;
+    Random *rand;
     
     double *fmax;
     vector<double> zmaxSensitivity;
@@ -33,5 +36,11 @@ class Individual {
     void printFmaxSensitivity(ostream&);
     void printQSensitivity(ostream&);
     void printFWidthSensitivity(ostream&);
+    void qsort(double *x, double *y, int left, int right);
+    int randPartition(double *x, double *y, int left, int right);
+        //void swap( int *array, int a, int b );
+    template <class T> void swap(T *, T, T);
+    
+    
 };
 #endif

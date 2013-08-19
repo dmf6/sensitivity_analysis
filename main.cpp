@@ -4,7 +4,7 @@ using namespace std;
 
 int main() {
         /* create population object */
-    Population p1(1, 15);
+    Population p1(144, 15);
     
         /* read in parameters */
     ifstream test("optimalModels.dat");

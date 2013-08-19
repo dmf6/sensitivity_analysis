@@ -11,6 +11,8 @@ Individual::Individual(int nreal) {
     numvars = nreal;
     vars = new double[nreal];
     fmax = new double[3];
+    rand = new Random();
+    rand->setSeed(static_cast<unsigned int>(time(0)));
 }
 
 Individual::~Individual() {
@@ -21,6 +23,7 @@ Individual::~Individual() {
 
 // /* id is the thread number */
 void Individual::simulate(int id) {
+
     int n = 0;
     double stderror = 0;
         /* copy contents of vars into pars vector
@@ -37,23 +40,25 @@ void Individual::simulate(int id) {
 
         /* variables for gsl_fit_linear */
     double c0, c1, cov00, cov01, cov11, sumsq;
-
+    double slope = 0;
+    
     double p0, pi0, p, pn, sct, R2, ym;
-    p0 = 0.001;
+    p0 = 0.1;
     R2 = 1;
     
     int m = 0;
 
         /* for each attribute */
-    for (int i =1; i < 4; i++) {
+    for (int i =0; i < 1; i++) {
             // for each parameter
         for (int j = 0; j < 15; j++) {
             cout << "STARTING SENSITIVITY ANALYSIS OF ATTRIBUTE " << i << "TO CHANGES IN PARAMETER " << j << "\n\n\n\n\n";
             
-            stderror = 0;
+            
+            
 /* simulate control */
             zf0 = getAttribute(id, i, vars);
-            pi0 = vars[j];
+             pi0 = vars[j];
             
             for (int k = 0; k < 2; k++) {
                 switch(k) {
@@ -65,7 +70,6 @@ void Individual::simulate(int id) {
                         break;
                 }
                 copy (vars, vars+15, pars.begin());
-
                 
                     /* set start value for parameter switch on
                      *  parameter i...for mid-point voltage we need to
@@ -91,13 +95,11 @@ void Individual::simulate(int id) {
                     /* push the relative change in the zf attribute value onto the vector */
                 zfAttrs.push_back((zf-zf0)/zf0);
             }
-            
 
             m = 1;
 
-            while (stderror < 0.1 && R2 > 0.85) {
-                
-                    //while (stderror < 0.1) {
+                //while (stderror < 0.1 && R2 > 0.85) {
+            while (1) {
                     /* for +/-x% change par[i] and run simulation. Save percent value and relative change in x and y vectors */
                 for (int l = 0; l < 2; l++) {
                     switch(l) {
@@ -120,8 +122,8 @@ void Individual::simulate(int id) {
                             pars[j] = p;
                             break;
                         default:
-                            pn = pow(1.05, 10*m)*p0;
-                            p = exp(flag*pn)*pars[j];
+                            pn = pow(1.05, 2*m)*p0;
+                            p = exp(flag*pn)*vars[j];
                             parVector.push_back((p-pi0)/pi0);
                             pars[j] = p;
                     }
@@ -146,33 +148,58 @@ void Individual::simulate(int id) {
                 
                 n = zfAttrs.size();
                 cout << "\n";
+
                 
-                    /*perform linear fit */
+                    /* qsort both vectors based on x */
+                  qsort(parVector.data(), zfAttrs.data(), 0, n-1);
+
+                 for (vector<double>::iterator it = zfAttrs.begin(); it!=zfAttrs.end(); ++it) {
+                    cout << ' ' << *it;
+                }
+                cout << "\n";
+              
+                for (vector<double>::iterator it = parVector.begin(); it!=parVector.end(); ++it) {
+                    cout << ' ' << *it;
+                }
+                         slope = c1;
+                     
+                         /*perform linear fit */
                 gsl_fit_linear (parVector.data(), 1, zfAttrs.data(), 1, n, 
                                 &c0, &c1, &cov00, &cov01, &cov11, 
                                 &sumsq);
-                
+               
                     /* refer to the ANOVA table in R */
-                stderror=sqrt(cov11);
+              
                 ym = gsl_stats_mean(zfAttrs.data(), 1, n);
                 sct = 0.0;
                 for (int l = 0; l < n; l++) {
                     sct += pow(zfAttrs[l]-ym, 2);  // total sum of squares
                 }
-
+                         
                 R2=1-sumsq/sct;
-                    /* Not sensitive */
-                // if (stderror == 0) {
-                //     break;
-                // }
-                
-                cout << "\n\n\n\n THE STANDARD ERROR IS " << stderror << "\n\n\n\n";
+                           stderror=sqrt(cov11);
+                 cout << "\n\n\n\n THE STANDARD ERROR IS " << stderror << "\n\n\n\n";
                 cout << "\n\n\n\n R^2 is  " << R2 << "\n\n\n\n";
                 cout << "\n\n\n\n THE SLOPE OF THE FIT IS " << c1 << "\n\n\n\n";
+                     if (stderror == 0) {
+                         zfAttrs.clear();
+                         parVector.clear();
+                         R2=1;
+                         stderror=0;
+                         break;
+                     }
+                     if(stderror > 0.1 || R2 < 0.97) {
+                             /* use previous slope */
+                         zfAttrs.clear();
+                         parVector.clear();
+                         R2=1;
+                         stderror=0;
+                         break;
+                     } 
             }
                 /* clear the x and y vectors ready for the next run */
-            zfAttrs.clear();
-            parVector.clear();
+            
+                      
                 /* save sensitivity (slope of linear fit) for attribute once we have finished with the parameter stepping */
             switch (i) {
                 case 0:
@@ -324,4 +351,50 @@ void Individual::printFWidthSensitivity(ostream& os) {
         }
              os << "\n";
          
+}
+
+
+/* pass in indices array */
+void Individual::qsort(double *x, double *y, int left, int right) {
+        //initialize pivot index
+    int pivot;
+    if (left < right) {
+            //pass objective number
+        pivot = randPartition(x, y, left, right);
+        qsort(x, y, left, pivot-1);
+        qsort(x, y, pivot+1, right);
+    }
+}
+
+int Individual::randPartition(double *x, double *y, int left, int right) {
+    double pivot;
+    int randIdx = rand->nextInt(left, right);
+    
+    swap<double>(x, right, randIdx);
+    swap<double>(y, right, randIdx);
+         
+    pivot = x[right];
+
+    int k = left-1;
+    for (int j = left; j < right; j++) {
+        if(x[j] <=pivot) {
+            k++;
+                //swap<int>(indices, k, j);
+                /* when we sway indices, sway x an y elements too */
+            swap<double>(x, k, j);
+            swap<double>(y, k, j);
+        }
+    }
+    swap<double>(y, k+1, right);
+    swap<double>(x, k+1, right);
+    return k+1;
+}
+
+template <class T>
+void Individual::swap( T *array, T a, T b ) {
+
+    T temp = array[ (int) a ];
+    
+    array[ (int) a ] = array[ (int) b ];
+    array[ (int) b ] = temp;
 }
